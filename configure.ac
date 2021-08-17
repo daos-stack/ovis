@@ -478,6 +478,27 @@ LDFLAGS_READLINE=$LIBS
 AC_SUBST([LDFLAGS_READLINE])
 LIBS=$TMPLIBS
 
+# DAOS telemetry support
+AC_MSG_CHECKING([for DAOS telemetry library])
+AC_ARG_WITH([daos],
+	[AS_HELP_STRING([--with-daos],
+		[build DAOS telemetry sampler @<:@default=no@:>@])],
+	[], [with_daos=no])
+AC_MSG_RESULT([$with_daos])
+AS_IF([test "x$with_daos" != xno], [
+	DAOS="yes"
+	LDFLAGS="$LDFLAGS -L$with_daos/lib64 -Wl,--enable-new-dtags -Wl,-rpath=$with_daos/lib64"
+	CFLAGS="$CFLAGS -I$with_daos/include"
+	AC_CHECK_HEADER(gurt/common.h,, [unset DAOS])
+	AC_CHECK_HEADER(gurt/telemetry_common.h,, [unset DAOS])
+	AC_CHECK_HEADER(gurt/telemetry_consumer.h,, [unset DAOS])
+	AC_CHECK_LIB([gurt], [d_tm_init],, [unset DAOS])
+])
+AM_CONDITIONAL([ENABLE_DAOS_SAMPLER], [test x$DAOS = xyes])
+AM_COND_IF([ENABLE_DAOS_SAMPLER],[
+	AC_DEFINE([ENABLE_DAOS_SAMPLER], [], [Build DAOS telemetry sampler])
+])
+
 dnl Munge library check
 if test -z "$ENABLE_MUNGE_TRUE"; then
 	AC_CHECK_LIB(munge, munge_encode, [], AC_MSG_ERROR([libmunge not found]))
@@ -889,6 +910,7 @@ ldms/src/sampler/ibm_occ/Makefile
 ldms/src/sampler/syspapi/Makefile
 ldms/src/sampler/app_sampler/Makefile
 ldms/src/contrib/sampler/Makefile
+ldms/src/contrib/sampler/daos/Makefile
 ldms/src/contrib/sampler/ipmireader/Makefile
 ldms/src/contrib/sampler/tutorial/Makefile
 ldms/src/third-plugins/Makefile
