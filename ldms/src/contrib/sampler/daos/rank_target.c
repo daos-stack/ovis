@@ -14,6 +14,8 @@
 #include <daos_types.h>
 #include "daos.h"
 
+#define INSTANCE_NAME_BUF_LEN (DAOS_SYS_NAME_MAX + 17)
+
 static ldms_schema_t rank_target_schema;
 
 static struct rbt rank_targets;
@@ -103,7 +105,7 @@ int rank_target_schema_is_initialized(void)
 
 void rank_target_schema_fini(void)
 {
-	log_fn(LDMSD_LDEBUG, SAMP, ": rank_target_schema_fini()\n");
+	log_fn(LDMSD_LDEBUG, SAMP": rank_target_schema_fini()\n");
 	if (rank_target_schema != NULL) {
 		ldms_schema_delete(rank_target_schema);
 		rank_target_schema = NULL;
@@ -116,7 +118,7 @@ int rank_target_schema_init(void)
 	int		rc, i, j, k;
 	char		name[64];
 
-	log_fn(LDMSD_LDEBUG, SAMP, ": rank_target_schema_init()\n");
+	log_fn(LDMSD_LDEBUG, SAMP": rank_target_schema_init()\n");
 	sch = ldms_schema_new("daos_rank_target");
 	if (sch == NULL)
 		goto err1;
@@ -196,7 +198,7 @@ int rank_target_schema_init(void)
 err2:
 	ldms_schema_delete(sch);
 err1:
-	log_fn(LDMSD_LERROR, SAMP" daos_rank_target schema creation failed\n");
+	log_fn(LDMSD_LERROR, SAMP": daos_rank_target schema creation failed\n");
 	return -1;
 }
 
@@ -216,9 +218,11 @@ struct target_data *rank_target_create(char *system, uint32_t rank, uint32_t tar
 	td->rank = rank;
 	td->target = target;
 
-	asprintf(&instance_name, "%s/%u/%u", system, rank, target);
+	instance_name = calloc(INSTANCE_NAME_BUF_LEN, sizeof(char *));
 	if (instance_name == NULL)
-		goto err2;
+		goto err1;
+	snprintf(instance_name, INSTANCE_NAME_BUF_LEN,
+		 "%s/%d/%d", system, rank, target);
 
 	rbn_init(&td->rank_targets_node, instance_name);
 
@@ -244,7 +248,7 @@ err1:
 }
 
 static void get_system_rank_targets(struct d_tm_context *ctx, char **system,
-				    uint32_t *rank, uint32_t *ntarget)
+				    uint64_t *rank, uint32_t *ntarget)
 {
 	struct d_tm_node_t	*node;
 
@@ -256,7 +260,7 @@ static void get_system_rank_targets(struct d_tm_context *ctx, char **system,
 
 	node = d_tm_find_metric(ctx, "/rank");
 	if (node != NULL)
-		d_tm_get_counter(ctx, (uint64_t *)(rank), node);
+		d_tm_get_counter(ctx, rank, node);
 
 	*ntarget = 8;
 	/*node = d_tm_find_metric(ctx, "num_targets");
@@ -287,7 +291,7 @@ void rank_targets_destroy(void)
 	struct target_data *td;
 
 	if (rbt_card(&rank_targets) > 0)
-		log_fn(LDMSD_LDEBUG, "destroying %lu rank targets\n",
+		log_fn(LDMSD_LDEBUG, SAMP": destroying %lu rank targets\n",
 				     rbt_card(&rank_targets));
 
 	while (!rbt_empty(&rank_targets)) {
@@ -303,20 +307,20 @@ void rank_targets_refresh(int num_engines)
 {
 	int			 i;
 	struct rbt		 new_rank_targets;
-	char			 *system = NULL;
-	uint32_t		 rank = 0xFFFFFFFF;
-	int			 ntarget;
 	int			 target;
-	char			*target_name = NULL;
+	char			 instance_name[INSTANCE_NAME_BUF_LEN];
 
 	rbt_init(&new_rank_targets, string_comparator);
 
 	for (i = 0; i < num_engines; i++) {
+		char		    *system = NULL;
 		struct d_tm_context *ctx = NULL;
+		uint64_t	     rank = -1;
+		int		     ntarget = 0;
 
 		ctx = d_tm_open(i);
 		if (!ctx) {
-			log_fn(LDMSD_LERROR, "Failed to open tm shm %d\n", i);
+			log_fn(LDMSD_LERROR, SAMP": Failed to open tm shm %d\n", i);
 			continue;
 		}
 
@@ -326,32 +330,28 @@ void rank_targets_refresh(int num_engines)
 			struct rbn *rbn = NULL;
 			struct target_data *td = NULL;
 
-			asprintf(&target_name, "%s/%d/%d", system, rank, target);
-			if (target_name == NULL)
-				continue;
+			snprintf(instance_name, sizeof(instance_name),
+				 "%s/%d/%d", system, rank, target);
 
-			rbn = rbt_find(&rank_targets, target_name);
+			rbn = rbt_find(&rank_targets, instance_name);
 			if (rbn) {
 				td = container_of(rbn, struct target_data,
 						rank_targets_node);
 				rbt_del(&rank_targets, &td->rank_targets_node);
-				//log_fn(LDMSD_LDEBUG, SAMP" found %s\n", target_name);
+				//log_fn(LDMSD_LDEBUG, SAMP": found %s\n", instance_name);
 			} else {
 				td = rank_target_create(system, rank, target);
-				//log_fn(LDMSD_LDEBUG, SAMP" created %s\n", target_name);
+				//log_fn(LDMSD_LDEBUG, SAMP": created %s\n", instance_name);
 			}
-			free(target_name);
 			if (td == NULL)
 				continue;
 
 			rbt_ins(&new_rank_targets, &td->rank_targets_node);
 		}
 
+		free(system);
 		d_tm_close(&ctx);
 	}
-
-	if (system)
-		free(system);
 
 	if (!rbt_empty(&new_rank_targets)) {
 		rank_targets_destroy();

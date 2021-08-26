@@ -25,7 +25,7 @@ static int config(struct ldmsd_plugin *self,
 {
 	char	*ival;
 
-	log_fn(LDMSD_LDEBUG, SAMP" config() called\n");
+	log_fn(LDMSD_LDEBUG, SAMP": config() called\n");
 	ival = av_value(avl, "producer");
 	if (ival) {
 		if (strlen(ival) < sizeof(producer_name)) {
@@ -43,7 +43,7 @@ static int config(struct ldmsd_plugin *self,
 			engine_count = cfg_engine_count;
 		}
 	}
-	log_fn(LDMSD_LDEBUG, SAMP" engine_count: %d\n", engine_count);
+	log_fn(LDMSD_LDEBUG, SAMP": engine_count: %d\n", engine_count);
 
 out:
 	return 0;
@@ -55,10 +55,10 @@ static int sample(struct ldmsd_sampler *self)
 	int			 i;
 	int			 rc = 0;
 
-	log_fn(LDMSD_LDEBUG, SAMP" sample() called\n");
+	log_fn(LDMSD_LDEBUG, SAMP": sample() called\n");
 	if (rank_target_schema_is_initialized() < 0) {
 		if (rank_target_schema_init() < 0) {
-			log_fn(LDMSD_LERROR, SAMP ": rank_target_schema_init failed.\n");
+			log_fn(LDMSD_LERROR, SAMP": rank_target_schema_init failed.\n");
 			return ENOMEM;
 		}
 	}
@@ -68,7 +68,7 @@ static int sample(struct ldmsd_sampler *self)
 	for (i = 0; i < engine_count; i++) {
 		ctx = d_tm_open(i);
 		if (!ctx) {
-			log_fn(LDMSD_LERROR, "Failed to open tm shm %d\n", i);
+			log_fn(LDMSD_LERROR, SAMP": Failed to open tm shm %d\n", i);
 			continue;
 		}
 
@@ -113,7 +113,7 @@ static struct ldmsd_sampler daos_plugin = {
 struct ldmsd_plugin *get_plugin(ldmsd_msg_log_f pf)
 {
 	log_fn = pf;
-	log_fn(LDMSD_LDEBUG, SAMP" get_plugin() called ("PACKAGE_STRING")\n");
+	log_fn(LDMSD_LDEBUG, SAMP": get_plugin() called ("PACKAGE_STRING")\n");
 	gethostname(producer_name, sizeof(producer_name));
 
 	return &daos_plugin.base;
