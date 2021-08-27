@@ -5,8 +5,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-Patent
  */
 
-#define _GNU_SOURCE
-
 #include <coll/rbt.h>
 #include "ldms.h"
 #include "ldmsd.h"
