@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: BSD-2-Clause-Patent
  */
 
+#define _GNU_SOURCE
+
 #include <coll/rbt.h>
 #include "ldms.h"
 #include "ldmsd.h"
@@ -88,7 +90,7 @@ static char *d64_stat_names[] = {
 	NULL,
 };
 
-struct target_data {
+struct rank_target_data {
 	char		*system;
 	uint32_t	 rank;
 	uint32_t	 target;
@@ -122,7 +124,8 @@ int rank_target_schema_init(void)
 	sch = ldms_schema_new("daos_rank_target");
 	if (sch == NULL)
 		goto err1;
-	rc = ldms_schema_meta_array_add(sch, "system", LDMS_V_CHAR_ARRAY, 64);
+	rc = ldms_schema_meta_array_add(sch, "system", LDMS_V_CHAR_ARRAY,
+					DAOS_SYS_NAME_MAX + 1);
 	if (rc < 0)
 		goto err2;
 	rc = ldms_schema_meta_array_add(sch, "rank", LDMS_V_U32, 1);
@@ -202,33 +205,38 @@ err1:
 	return -1;
 }
 
-struct target_data *rank_target_create(char *system, uint32_t rank, uint32_t target)
+struct rank_target_data *rank_target_create(char *system, uint32_t rank,
+					    uint32_t target,
+					    const char *instance_name)
 {
-	struct target_data	*td;
-	char			 *instance_name = NULL;
+	struct rank_target_data	*rtd = NULL;
+	char			*key = NULL;
 	ldms_set_t		 set;
 	int			 index;
 
-	td = calloc(1, sizeof(*td));
-	if (td == NULL)
+	rtd = calloc(1, sizeof(*rtd));
+	if (rtd == NULL) {
+		errno = ENOMEM;
 		return NULL;
-	td->system = strdup(system);
-	if (td->system == NULL)
+	}
+	rtd->system = strdup(system);
+	if (rtd->system == NULL) {
+		errno = ENOMEM;
 		goto err1;
-	td->rank = rank;
-	td->target = target;
+	}
+	rtd->rank = rank;
+	rtd->target = target;
 
-	instance_name = calloc(INSTANCE_NAME_BUF_LEN, sizeof(char *));
-	if (instance_name == NULL)
-		goto err1;
-	snprintf(instance_name, INSTANCE_NAME_BUF_LEN,
-		 "%s/%d/%d", system, rank, target);
-
-	rbn_init(&td->rank_targets_node, instance_name);
+	key = strndup(instance_name, INSTANCE_NAME_BUF_LEN);
+	if (key == NULL) {
+		errno = ENOMEM;
+		goto err2;
+	}
+	rbn_init(&rtd->rank_targets_node, key);
 
 	set = ldms_set_new(instance_name, rank_target_schema);
 	if (set == NULL)
-		goto err2;
+		goto err3;
 	index = ldms_metric_by_name(set, "system");
 	ldms_metric_array_set_str(set, index, system);
 	index = ldms_metric_by_name(set, "rank");
@@ -237,19 +245,22 @@ struct target_data *rank_target_create(char *system, uint32_t rank, uint32_t tar
 	ldms_metric_set_u32(set, index, target);
 	ldms_set_publish(set);
 
-	td->metrics = set;
-	return td;
+	rtd->metrics = set;
+	return rtd;
 
+err3:
+	free(key);
 err2:
-	free(td->system);
+	free(rtd->system);
 err1:
-	free(td);
+	free(rtd);
 	return NULL;
 }
 
 static void get_system_rank_targets(struct d_tm_context *ctx, char **system,
-				    uint64_t *rank, uint32_t *ntarget)
+				    uint32_t *rank, uint32_t *ntarget)
 {
+	uint64_t		 ctr_rank = -1;
 	struct d_tm_node_t	*node;
 
 	if (system == NULL || rank == NULL || ntarget == NULL)
@@ -260,7 +271,8 @@ static void get_system_rank_targets(struct d_tm_context *ctx, char **system,
 
 	node = d_tm_find_metric(ctx, "/rank");
 	if (node != NULL)
-		d_tm_get_counter(ctx, rank, node);
+		d_tm_get_counter(ctx, &ctr_rank, node);
+	*rank = ctr_rank;
 
 	*ntarget = 8;
 	/*node = d_tm_find_metric(ctx, "num_targets");
@@ -270,25 +282,25 @@ static void get_system_rank_targets(struct d_tm_context *ctx, char **system,
 	*/
 }
 
-static void rank_target_destroy(struct target_data *td)
+static void rank_target_destroy(struct rank_target_data *rtd)
 {
-	if (td == NULL)
+	if (rtd == NULL)
 		return;
 
-	if (td->metrics != NULL) {
-		ldms_set_unpublish(td->metrics);
-		ldms_set_delete(td->metrics);
+	if (rtd->metrics != NULL) {
+		ldms_set_unpublish(rtd->metrics);
+		ldms_set_delete(rtd->metrics);
 	}
 
-	free(td->system);
-	free(td->rank_targets_node.key);
-	free(td);
+	free(rtd->system);
+	free(rtd->rank_targets_node.key);
+	free(rtd);
 }
 
 void rank_targets_destroy(void)
 {
 	struct rbn *rbn;
-	struct target_data *td;
+	struct rank_target_data *rtd;
 
 	if (rbt_card(&rank_targets) > 0)
 		log_fn(LDMSD_LDEBUG, SAMP": destroying %lu rank targets\n",
@@ -296,10 +308,10 @@ void rank_targets_destroy(void)
 
 	while (!rbt_empty(&rank_targets)) {
 		rbn = rbt_min(&rank_targets);
-		td = container_of(rbn, struct target_data,
+		rtd = container_of(rbn, struct rank_target_data,
 					rank_targets_node);
 		rbt_del(&rank_targets, rbn);
-		rank_target_destroy(td);
+		rank_target_destroy(rtd);
 	}
 }
 
@@ -315,7 +327,7 @@ void rank_targets_refresh(int num_engines)
 	for (i = 0; i < num_engines; i++) {
 		char		    *system = NULL;
 		struct d_tm_context *ctx = NULL;
-		uint64_t	     rank = -1;
+		uint32_t	     rank = -1;
 		int		     ntarget = 0;
 
 		ctx = d_tm_open(i);
@@ -328,25 +340,30 @@ void rank_targets_refresh(int num_engines)
 
 		for (target = 0; target < ntarget; target++) {
 			struct rbn *rbn = NULL;
-			struct target_data *td = NULL;
+			struct rank_target_data *rtd = NULL;
 
 			snprintf(instance_name, sizeof(instance_name),
 				 "%s/%d/%d", system, rank, target);
 
 			rbn = rbt_find(&rank_targets, instance_name);
 			if (rbn) {
-				td = container_of(rbn, struct target_data,
-						rank_targets_node);
-				rbt_del(&rank_targets, &td->rank_targets_node);
+				rtd = container_of(rbn, struct rank_target_data,
+							rank_targets_node);
+				rbt_del(&rank_targets, &rtd->rank_targets_node);
 				//log_fn(LDMSD_LDEBUG, SAMP": found %s\n", instance_name);
 			} else {
-				td = rank_target_create(system, rank, target);
+				rtd = rank_target_create(system, rank, target, instance_name);
+				if (rtd == NULL) {
+					log_fn(LDMSD_LERROR, SAMP": failed to create rank target %s (%s)\n",
+								instance_name, strerror(errno));
+					continue;
+				}
 				//log_fn(LDMSD_LDEBUG, SAMP": created %s\n", instance_name);
 			}
-			if (td == NULL)
+			if (rtd == NULL)
 				continue;
 
-			rbt_ins(&new_rank_targets, &td->rank_targets_node);
+			rbt_ins(&new_rank_targets, &rtd->rank_targets_node);
 		}
 
 		free(system);
@@ -439,9 +456,10 @@ void rank_targets_sample(struct d_tm_context *ctx)
 	struct rbn *rbn;
 
 	RBT_FOREACH(rbn, &rank_targets) {
-		struct target_data *td;
+		struct rank_target_data *rtd;
 
-		td = container_of(rbn, struct target_data, rank_targets_node);
-		rank_target_sample(ctx, td->target, td->metrics);
+		rtd = container_of(rbn, struct rank_target_data,
+					rank_targets_node);
+		rank_target_sample(ctx, rtd->target, rtd->metrics);
 	}
 }

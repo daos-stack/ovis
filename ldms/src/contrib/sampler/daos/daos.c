@@ -14,6 +14,7 @@
 #include "gurt/telemetry_consumer.h"
 #include "daos.h"
 #include "rank_target.h"
+#include "pool_target.h"
 
 ldmsd_msg_log_f log_fn;
 static ldmsd_msg_log_f msglog;
@@ -62,8 +63,15 @@ static int sample(struct ldmsd_sampler *self)
 			return ENOMEM;
 		}
 	}
+	if (pool_target_schema_is_initialized() < 0) {
+		if (pool_target_schema_init() < 0) {
+			log_fn(LDMSD_LERROR, SAMP": pool_target_schema_init failed.\n");
+			return ENOMEM;
+		}
+	}
 
 	rank_targets_refresh(engine_count);
+	pool_targets_refresh(engine_count);
 
 	for (i = 0; i < engine_count; i++) {
 		ctx = d_tm_open(i);
@@ -73,6 +81,7 @@ static int sample(struct ldmsd_sampler *self)
 		}
 
 		rank_targets_sample(ctx);
+		pool_targets_sample(ctx);
 
 		d_tm_close(&ctx);
 	}
@@ -85,6 +94,8 @@ static void term(struct ldmsd_plugin *self)
 	log_fn(LDMSD_LDEBUG, SAMP" term() called\n");
 	rank_targets_destroy();
 	rank_target_schema_fini();
+	pool_targets_destroy();
+	pool_target_schema_fini();
 }
 
 static ldms_set_t get_set(struct ldmsd_sampler *self)

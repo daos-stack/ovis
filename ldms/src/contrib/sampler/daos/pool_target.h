@@ -1,0 +1,16 @@
+/* -*- c-basic-offset: 8 -*- */
+/**
+ * (C) Copyright 2021 Intel Corporation.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause-Patent
+ */
+
+#include <gurt/telemetry_common.h>
+
+int pool_target_schema_is_initialized(void);
+int pool_target_schema_init(void);
+void pool_target_schema_fini(void);
+
+void pool_targets_refresh(int num_engines);
+void pool_targets_sample(struct d_tm_context *ctx);
+void pool_targets_destroy(void);
