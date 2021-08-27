@@ -23,7 +23,10 @@ config name=daos producer=${HOSTNAME}
 start name=daos interval=${SAMPLE_INTERVAL}
 ```
 
-Next, start ldmsd in foreground mode with debug logging enabled: `SAMPLE_INTERVAL=5000000 ldmsd -x sock:10444 -v DEBUG -F -c /path/to/sampler.conf`
+Next, start ldmsd in foreground mode with debug logging enabled: `SAMPLE_INTERVAL=5000000 ldmsd -m1MB -x sock:10444 -v DEBUG -F -c /path/to/sampler.conf`
+
+NOTE: The default memory size (512KB) is too small for the number of metrics collected. Larger sizes may be specified for
+a large number of pools.
 
 Finally, run ldms_ls in order to see the collected metrics (updated every 5s with the sample interval shown above):
 ```
