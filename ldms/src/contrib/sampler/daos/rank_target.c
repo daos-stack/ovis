@@ -219,7 +219,7 @@ struct rank_target_data *rank_target_create(char *system, uint32_t rank,
 		errno = ENOMEM;
 		return NULL;
 	}
-	rtd->system = strdup(system);
+	rtd->system = strndup(system, DAOS_SYS_NAME_MAX + 1);
 	if (rtd->system == NULL) {
 		errno = ENOMEM;
 		goto err1;
