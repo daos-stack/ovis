@@ -26,6 +26,12 @@ static char *rank_target_lat_metrics[] = {
 	NULL,
 };
 
+static char *rank_target_dtx_metrics[] = {
+	"io/dtx/committed",
+	"io/dtx/commitable",
+	NULL,
+};
+
 static char *rank_target_ops_metrics[] = {
 	"io/ops/update",
 	"io/ops/fetch",
@@ -191,6 +197,13 @@ int rank_target_schema_init(void)
 					goto err2;
 			}
 		}
+	}
+
+	for (i = 0; rank_target_dtx_metrics[i] != NULL; i++) {
+		rc = ldms_schema_metric_add(sch, rank_target_dtx_metrics[i],
+					    LDMS_V_U64);
+		if (rc < 0)
+			goto err2;
 	}
 
 	rank_target_schema = sch;
@@ -388,6 +401,7 @@ static void rank_target_sample(struct d_tm_context *ctx,
 	int			 i, j, k;
 
 	ldms_transaction_begin(set);
+
 	for (i = 0; rank_target_lat_metrics[i] != NULL; i++) {
 		for (j = 0; rank_target_lat_buckets[j] != NULL; j++) {
 			stats = (const struct d_tm_stats_t) {0};
@@ -446,6 +460,24 @@ static void rank_target_sample(struct d_tm_context *ctx,
 			}
 		}
 	}
+
+	for (i = 0; rank_target_dtx_metrics[i] != NULL; i++) {
+		snprintf(dtm_name, sizeof(dtm_name), "%s/tgt_%d",
+			rank_target_dtx_metrics[i],
+			target);
+		node = d_tm_find_metric(ctx, dtm_name);
+		if (node == NULL)
+			continue;
+		rc = d_tm_get_gauge(ctx, &cur, &stats, node);
+		if (rc != DER_SUCCESS)
+			continue;
+
+		index = ldms_metric_by_name(set, rank_target_dtx_metrics[i]);
+		if (index < 0)
+			continue;
+		ldms_metric_set_u64(set, index, cur);
+	}
+
 	ldms_transaction_end(set);
 }
 

@@ -63,7 +63,6 @@ D d64        io/latency/update/128KB/stddev             238.011404
 ```
 
 # TODO
-- Add support for ephemeral stats (pools, etc)
 - Add networking/dtx stats
 - General hardening and error handling
 
