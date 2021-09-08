@@ -233,7 +233,7 @@ static void get_system_pools_targets(struct d_tm_context *ctx, char **system,
 	struct d_tm_nodeList_t	*list = NULL;
 	struct d_tm_nodeList_t	*head = NULL;
 	struct d_tm_node_t	*node = NULL;
-	uint64_t		 num_pool_links = 0;
+	uint64_t		 num_pools = 0;
 	char			**tmp_pools = NULL;
 	int			 i, rc;
 
@@ -260,20 +260,16 @@ static void get_system_pools_targets(struct d_tm_context *ctx, char **system,
 	if (node == NULL)
 		return;
 
-	rc = d_tm_list(ctx, &list, node, D_TM_LINK);
+	rc = d_tm_list_subdirs(ctx, &list, node, &num_pools, 2);
 	if (rc != DER_SUCCESS)
 		return;
 	head = list;
 
-	num_pool_links = d_tm_count_metrics(ctx, node, D_TM_LINK);
-	if (num_pool_links == 0)
-		return;
-
-	tmp_pools = calloc(num_pool_links, sizeof(char *));
+	tmp_pools = calloc(num_pools, sizeof(char *));
 	if (tmp_pools == NULL)
 		return;
 
-	for (i = 0; list && i < num_pool_links; i++) {
+	for (i = 0; list && i < num_pools; i++) {
 		char *name = NULL;
 
 		node = list->dtnl_node;
@@ -290,12 +286,12 @@ static void get_system_pools_targets(struct d_tm_context *ctx, char **system,
 	d_tm_list_free(head);
 
 	*pools = tmp_pools;
-	*npool = num_pool_links;
+	*npool = num_pools;
 
 	return;
 
 err1:
-	pool_list_free(tmp_pools, num_pool_links);
+	pool_list_free(tmp_pools, num_pools);
 }
 
 static void pool_target_destroy(struct pool_target_data *ptd)
