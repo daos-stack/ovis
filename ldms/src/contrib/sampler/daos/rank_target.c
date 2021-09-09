@@ -28,7 +28,7 @@ static char *rank_target_lat_metrics[] = {
 
 static char *rank_target_dtx_metrics[] = {
 	"io/dtx/committed",
-	"io/dtx/commitable",
+	"io/dtx/committable",
 	NULL,
 };
 
@@ -411,18 +411,28 @@ static void rank_target_sample(struct d_tm_context *ctx,
 				rank_target_lat_buckets[j],
 				target);
 			node = d_tm_find_metric(ctx, dtm_name);
-			if (node == NULL)
+			if (node == NULL) {
+				log_fn(LDMSD_LERROR,
+				       SAMP": Failed to find metric %s\n", dtm_name);
 				continue;
+			}
 			rc = d_tm_get_gauge(ctx, &cur, &stats, node);
-			if (rc != DER_SUCCESS)
+			if (rc != DER_SUCCESS) {
+				log_fn(LDMSD_LERROR,
+				       SAMP": Failed to fetch gauge %s\n", dtm_name);
 				continue;
+			}
 
 			snprintf(ldms_name, sizeof(ldms_name), "%s/%s",
 				rank_target_lat_metrics[i],
 				rank_target_lat_buckets[j]);
 			index = ldms_metric_by_name(set, ldms_name);
-			if (index < 0)
+			if (index < 0) {
+				log_fn(LDMSD_LERROR,
+				       SAMP": Failed to fetch index for %s\n",
+				       ldms_name);
 				continue;
+			}
 			ldms_metric_set_u64(set, index, cur);
 
 			for (k = 0; u64_stat_names[k] != NULL; k++) {
@@ -432,8 +442,12 @@ static void rank_target_sample(struct d_tm_context *ctx,
 					rank_target_lat_buckets[j],
 					stat_name);
 				index = ldms_metric_by_name(set, ldms_name);
-				if (index < 0)
+				if (index < 0) {
+					log_fn(LDMSD_LERROR,
+					       SAMP": Failed to fetch index for %s\n",
+					       ldms_name);
 					continue;
+				}
 
 				if (strcmp(stat_name, "min") == 0)
 					ldms_metric_set_u64(set, index, stats.dtm_min);
@@ -450,8 +464,12 @@ static void rank_target_sample(struct d_tm_context *ctx,
 					stat_name);
 
 				index = ldms_metric_by_name(set, ldms_name);
-				if (index < 0)
+				if (index < 0) {
+					log_fn(LDMSD_LERROR,
+					       SAMP": Failed to fetch index for %s\n",
+					       ldms_name);
 					continue;
+				}
 
 				if (strcmp(stat_name, "mean") == 0)
 					ldms_metric_set_double(set, index, stats.mean);
@@ -466,11 +484,17 @@ static void rank_target_sample(struct d_tm_context *ctx,
 			rank_target_dtx_metrics[i],
 			target);
 		node = d_tm_find_metric(ctx, dtm_name);
-		if (node == NULL)
+		if (node == NULL) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to find metric %s\n", dtm_name);
 			continue;
+		}
 		rc = d_tm_get_gauge(ctx, &cur, &stats, node);
-		if (rc != DER_SUCCESS)
+		if (rc != DER_SUCCESS) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to fetch gauge %s\n", dtm_name);
 			continue;
+		}
 
 		index = ldms_metric_by_name(set, rank_target_dtx_metrics[i]);
 		if (index < 0)

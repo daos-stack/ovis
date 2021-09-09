@@ -40,25 +40,25 @@ static char *pool_target_counters[] = {
 	"ops/dtx_abort",
 	"ops/dtx_check",
 	"ops/dtx_refresh",
-	"io/ops/update",
-	"io/ops/fetch",
-	"io/ops/dkey_enum",
-	"io/ops/akey_enum",
-	"io/ops/recx_enum",
-	"io/ops/obj_enum",
-	"io/ops/obj_punch",
-	"io/ops/dkey_punch",
-	"io/ops/akey_punch",
-	"io/ops/key_query",
-	"io/ops/obj_sync",
-	"io/ops/tgt_update",
-	"io/ops/tgt_punch",
-	"io/ops/tgt_dkey_punch",
-	"io/ops/tgt_akey_punch",
-	"io/ops/migrate",
-	"io/ops/ec_agg",
-	"io/ops/ec_rep",
-	"io/ops/compound",
+	"ops/update",
+	"ops/fetch",
+	"ops/dkey_enum",
+	"ops/akey_enum",
+	"ops/recx_enum",
+	"ops/obj_enum",
+	"ops/obj_punch",
+	"ops/dkey_punch",
+	"ops/akey_punch",
+	"ops/key_query",
+	"ops/obj_sync",
+	"ops/tgt_update",
+	"ops/tgt_punch",
+	"ops/tgt_dkey_punch",
+	"ops/tgt_akey_punch",
+	"ops/migrate",
+	"ops/ec_agg",
+	"ops/ec_rep",
+	"ops/compound",
 	"restarted",
 	"resent",
 	"xferred/fetch",
@@ -407,12 +407,11 @@ void pool_targets_refresh(int num_engines)
 	}
 }
 
-static void pool_target_sample(struct d_tm_context *ctx,
+static void pool_target_sample(struct d_tm_context *ctx, const char *pool,
 			       uint32_t target, ldms_set_t set)
 {
 	struct d_tm_node_t	*node;
-	char			 dtm_name[64];
-	char			 ldms_name[64];
+	char			 dtm_name[128];
 	const char		*stat_name;
 	uint64_t		 cur;
 	int			 rc;
@@ -421,54 +420,79 @@ static void pool_target_sample(struct d_tm_context *ctx,
 
 	ldms_transaction_begin(set);
 	for (i = 0; pool_gauges[i] != NULL; i++) {
-		snprintf(dtm_name, sizeof(dtm_name), "%s",
-			pool_gauges[i]);
+		snprintf(dtm_name, sizeof(dtm_name), "pool/%s/%s",
+			 pool, pool_gauges[i]);
 		node = d_tm_find_metric(ctx, dtm_name);
-		if (node == NULL)
+		if (node == NULL) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to find metric %s\n", dtm_name);
 			continue;
+		}
 		rc = d_tm_get_gauge(ctx, &cur, NULL, node);
-		if (rc != DER_SUCCESS)
+		if (rc != DER_SUCCESS) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to fetch gauge %s\n", dtm_name);
 			continue;
+		}
 
-		index = ldms_metric_by_name(set, dtm_name);
-		if (index < 0)
+		index = ldms_metric_by_name(set, pool_gauges[i]);
+		if (index < 0) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to fetch index for %s\n", pool_gauges[i]);
 			continue;
+		}
 		ldms_metric_set_u64(set, index, cur);
 	}
 
 	for (i = 0; pool_counters[i] != NULL; i++) {
-		snprintf(dtm_name, sizeof(dtm_name), "%s",
-			pool_counters[i]);
+		snprintf(dtm_name, sizeof(dtm_name), "pool/%s/%s",
+			 pool, pool_counters[i]);
 		node = d_tm_find_metric(ctx, dtm_name);
-		if (node == NULL)
+		if (node == NULL) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to find metric %s\n", dtm_name);
 			continue;
+		}
 		rc = d_tm_get_counter(ctx, &cur, node);
-		if (rc != DER_SUCCESS)
+		if (rc != DER_SUCCESS) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to fetch counter %s\n", dtm_name);
 			continue;
+		}
 
-		index = ldms_metric_by_name(set, dtm_name);
-		if (index < 0)
+		index = ldms_metric_by_name(set, pool_counters[i]);
+		if (index < 0) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to fetch index for %s\n", pool_counters[i]);
 			continue;
+		}
 		ldms_metric_set_u64(set, index, cur);
 	}
 
 
 	for (i = 0; pool_target_counters[i] != NULL; i++) {
-		snprintf(dtm_name, sizeof(dtm_name), "%s/tgt_%d",
-			pool_target_counters[i],
-			target);
+		snprintf(dtm_name, sizeof(dtm_name), "pool/%s/%s/tgt_%d",
+			 pool, pool_target_counters[i], target);
 		node = d_tm_find_metric(ctx, dtm_name);
-		if (node == NULL)
+		if (node == NULL) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to find metric %s\n", dtm_name);
 			continue;
+		}
 		rc = d_tm_get_counter(ctx, &cur, node);
-		if (rc != DER_SUCCESS)
+		if (rc != DER_SUCCESS) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to fetch counter %s\n", dtm_name);
 			continue;
+		}
 
-		snprintf(ldms_name, sizeof(ldms_name), "%s",
-			pool_target_counters[i]);
-		index = ldms_metric_by_name(set, ldms_name);
-		if (index < 0)
+		index = ldms_metric_by_name(set, pool_target_counters[i]);
+		if (index < 0) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": Failed to fetch index for %s\n",
+			       pool_target_counters[i]);
 			continue;
+		}
 		ldms_metric_set_u64(set, index, cur);
 
 	}
@@ -484,6 +508,6 @@ void pool_targets_sample(struct d_tm_context *ctx)
 
 		ptd = container_of(rbn, struct pool_target_data,
 				   pool_targets_node);
-		pool_target_sample(ctx, ptd->target, ptd->metrics);
+		pool_target_sample(ctx, ptd->pool, ptd->target, ptd->metrics);
 	}
 }
