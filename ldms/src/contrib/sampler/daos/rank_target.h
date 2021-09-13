@@ -12,5 +12,5 @@ int rank_target_schema_init(void);
 void rank_target_schema_fini(void);
 
 void rank_targets_refresh(int num_engines);
-void rank_targets_sample(struct d_tm_context *ctx);
+void rank_targets_sample(struct d_tm_context *ctx, uint32_t rank);
 void rank_targets_destroy(void);

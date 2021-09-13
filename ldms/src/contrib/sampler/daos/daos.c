@@ -21,7 +21,8 @@ static ldmsd_msg_log_f msglog;
 static int engine_count = 2;
 char producer_name[LDMS_PRODUCER_NAME_MAX];
 
-static int config(struct ldmsd_plugin *self,
+static int
+config(struct ldmsd_plugin *self,
 		  struct attr_value_list *kwl, struct attr_value_list *avl)
 {
 	char	*ival;
@@ -50,9 +51,28 @@ out:
 	return 0;
 }
 
-static int sample(struct ldmsd_sampler *self)
+static int
+get_daos_rank(struct d_tm_context *ctx, uint32_t *rank)
+{
+	uint64_t		 val = -1;
+	struct d_tm_node_t	*node;
+
+	/* TODO: Get this from the metadata */
+	node = d_tm_find_metric(ctx, "/rank");
+	if (node == NULL)
+		return -EINVAL;
+
+	d_tm_get_counter(ctx, &val, node);
+	*rank = val;
+
+	return 0;
+}
+
+static int
+sample(struct ldmsd_sampler *self)
 {
 	struct d_tm_context	*ctx = NULL;
+	uint32_t		 rank;
 	int			 i;
 	int			 rc = 0;
 
@@ -80,8 +100,14 @@ static int sample(struct ldmsd_sampler *self)
 			continue;
 		}
 
-		rank_targets_sample(ctx);
-		pool_targets_sample(ctx);
+		rc = get_daos_rank(ctx, &rank);
+		if (rc != 0) {
+			log_fn(LDMSD_LERROR, SAMP": Failed to get rank from tm shm %d\n", i);
+			continue;
+		}
+
+		rank_targets_sample(ctx, rank);
+		pool_targets_sample(ctx, rank);
 
 		d_tm_close(&ctx);
 	}
@@ -89,7 +115,8 @@ static int sample(struct ldmsd_sampler *self)
 	return rc;
 }
 
-static void term(struct ldmsd_plugin *self)
+static void
+term(struct ldmsd_plugin *self)
 {
 	log_fn(LDMSD_LDEBUG, SAMP" term() called\n");
 	rank_targets_destroy();
@@ -98,12 +125,14 @@ static void term(struct ldmsd_plugin *self)
 	pool_target_schema_fini();
 }
 
-static ldms_set_t get_set(struct ldmsd_sampler *self)
+static ldms_set_t
+get_set(struct ldmsd_sampler *self)
 {
 	return NULL;
 }
 
-static const char *usage(struct ldmsd_plugin *self)
+static const char *
+usage(struct ldmsd_plugin *self)
 {
 	log_fn(LDMSD_LDEBUG, SAMP" usage() called\n");
 	return  "config name=" SAMP " " BASE_CONFIG_USAGE;
@@ -121,7 +150,8 @@ static struct ldmsd_sampler daos_plugin = {
 	.sample = sample,
 };
 
-struct ldmsd_plugin *get_plugin(ldmsd_msg_log_f pf)
+struct ldmsd_plugin *
+get_plugin(ldmsd_msg_log_f pf)
 {
 	log_fn = pf;
 	log_fn(LDMSD_LDEBUG, SAMP": get_plugin() called ("PACKAGE_STRING")\n");

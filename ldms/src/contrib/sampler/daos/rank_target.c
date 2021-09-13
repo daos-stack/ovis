@@ -102,14 +102,16 @@ struct rank_target_data {
 	struct rbn	 rank_targets_node;
 };
 
-int rank_target_schema_is_initialized(void)
+int
+rank_target_schema_is_initialized(void)
 {
 	if (rank_target_schema != NULL)
 		return 0;
 	return -1;
 }
 
-void rank_target_schema_fini(void)
+void
+rank_target_schema_fini(void)
 {
 	log_fn(LDMSD_LDEBUG, SAMP": rank_target_schema_fini()\n");
 	if (rank_target_schema != NULL) {
@@ -118,7 +120,8 @@ void rank_target_schema_fini(void)
 	}
 }
 
-int rank_target_schema_init(void)
+int
+rank_target_schema_init(void)
 {
 	ldms_schema_t	sch;
 	int		rc, i, j, k;
@@ -216,9 +219,9 @@ err1:
 	return -1;
 }
 
-struct rank_target_data *rank_target_create(char *system, uint32_t rank,
-					    uint32_t target,
-					    const char *instance_name)
+struct rank_target_data *
+rank_target_create(char *system, uint32_t rank,
+		   uint32_t target, const char *instance_name)
 {
 	struct rank_target_data	*rtd = NULL;
 	char			*key = NULL;
@@ -268,8 +271,9 @@ err1:
 	return NULL;
 }
 
-static void get_system_rank_targets(struct d_tm_context *ctx, char **system,
-				    uint32_t *rank, uint32_t *ntarget)
+static void
+get_system_rank_targets(struct d_tm_context *ctx, char **system,
+			uint32_t *rank, uint32_t *ntarget)
 {
 	uint64_t		 ctr_rank = -1;
 	struct d_tm_node_t	*node;
@@ -293,7 +297,8 @@ static void get_system_rank_targets(struct d_tm_context *ctx, char **system,
 	*/
 }
 
-static void rank_target_destroy(struct rank_target_data *rtd)
+static void
+rank_target_destroy(struct rank_target_data *rtd)
 {
 	if (rtd == NULL)
 		return;
@@ -308,7 +313,8 @@ static void rank_target_destroy(struct rank_target_data *rtd)
 	free(rtd);
 }
 
-void rank_targets_destroy(void)
+void
+rank_targets_destroy(void)
 {
 	struct rbn *rbn;
 	struct rank_target_data *rtd;
@@ -326,7 +332,8 @@ void rank_targets_destroy(void)
 	}
 }
 
-void rank_targets_refresh(int num_engines)
+void
+rank_targets_refresh(int num_engines)
 {
 	int			 i;
 	struct rbt		 new_rank_targets;
@@ -387,8 +394,8 @@ void rank_targets_refresh(int num_engines)
 	}
 }
 
-static void rank_target_sample(struct d_tm_context *ctx,
-			       uint32_t target, ldms_set_t set)
+static void
+rank_target_sample(struct d_tm_context *ctx, struct rank_target_data *rtd)
 {
 	struct d_tm_node_t	*node;
 	struct d_tm_stats_t	 stats;
@@ -400,48 +407,53 @@ static void rank_target_sample(struct d_tm_context *ctx,
 	int			 index;
 	int			 i, j, k;
 
-	ldms_transaction_begin(set);
+	ldms_transaction_begin(rtd->metrics);
 
 	for (i = 0; rank_target_lat_metrics[i] != NULL; i++) {
 		for (j = 0; rank_target_lat_buckets[j] != NULL; j++) {
 			stats = (const struct d_tm_stats_t) {0};
 
-			snprintf(dtm_name, sizeof(dtm_name), "%s/%s/tgt_%d",
-				rank_target_lat_metrics[i],
-				rank_target_lat_buckets[j],
-				target);
+			snprintf(dtm_name, sizeof(dtm_name),
+				 "%s/%s/tgt_%d",
+				 rank_target_lat_metrics[i],
+				 rank_target_lat_buckets[j],
+				 rtd->target);
 			node = d_tm_find_metric(ctx, dtm_name);
 			if (node == NULL) {
 				log_fn(LDMSD_LERROR,
-				       SAMP": Failed to find metric %s\n", dtm_name);
+				       SAMP": Failed to find metric %s\n",
+				       dtm_name);
 				continue;
 			}
 			rc = d_tm_get_gauge(ctx, &cur, &stats, node);
 			if (rc != DER_SUCCESS) {
 				log_fn(LDMSD_LERROR,
-				       SAMP": Failed to fetch gauge %s\n", dtm_name);
+				       SAMP": Failed to fetch gauge %s\n",
+				       dtm_name);
 				continue;
 			}
 
 			snprintf(ldms_name, sizeof(ldms_name), "%s/%s",
 				rank_target_lat_metrics[i],
 				rank_target_lat_buckets[j]);
-			index = ldms_metric_by_name(set, ldms_name);
+			index = ldms_metric_by_name(rtd->metrics, ldms_name);
 			if (index < 0) {
 				log_fn(LDMSD_LERROR,
 				       SAMP": Failed to fetch index for %s\n",
 				       ldms_name);
 				continue;
 			}
-			ldms_metric_set_u64(set, index, cur);
+			ldms_metric_set_u64(rtd->metrics, index, cur);
 
 			for (k = 0; u64_stat_names[k] != NULL; k++) {
 				stat_name = u64_stat_names[k];
-				snprintf(ldms_name, sizeof(ldms_name), "%s/%s/%s",
-					rank_target_lat_metrics[i],
-					rank_target_lat_buckets[j],
-					stat_name);
-				index = ldms_metric_by_name(set, ldms_name);
+				snprintf(ldms_name, sizeof(ldms_name),
+					 "%s/%s/%s",
+					 rank_target_lat_metrics[i],
+					 rank_target_lat_buckets[j],
+					 stat_name);
+				index = ldms_metric_by_name(rtd->metrics,
+							    ldms_name);
 				if (index < 0) {
 					log_fn(LDMSD_LERROR,
 					       SAMP": Failed to fetch index for %s\n",
@@ -450,11 +462,14 @@ static void rank_target_sample(struct d_tm_context *ctx,
 				}
 
 				if (strcmp(stat_name, "min") == 0)
-					ldms_metric_set_u64(set, index, stats.dtm_min);
+					ldms_metric_set_u64(rtd->metrics, index,
+							    stats.dtm_min);
 				else if (strcmp(stat_name, "max") == 0)
-					ldms_metric_set_u64(set, index, stats.dtm_max);
+					ldms_metric_set_u64(rtd->metrics, index,
+							    stats.dtm_max);
 				else if (strcmp(stat_name, "samples") == 0)
-					ldms_metric_set_u64(set, index, stats.sample_size);
+					ldms_metric_set_u64(rtd->metrics, index,
+							    stats.sample_size);
 			}
 			for (k = 0; d64_stat_names[k] != NULL; k++) {
 				stat_name = d64_stat_names[k];
@@ -463,7 +478,8 @@ static void rank_target_sample(struct d_tm_context *ctx,
 					rank_target_lat_buckets[j],
 					stat_name);
 
-				index = ldms_metric_by_name(set, ldms_name);
+				index = ldms_metric_by_name(rtd->metrics,
+							    ldms_name);
 				if (index < 0) {
 					log_fn(LDMSD_LERROR,
 					       SAMP": Failed to fetch index for %s\n",
@@ -472,9 +488,11 @@ static void rank_target_sample(struct d_tm_context *ctx,
 				}
 
 				if (strcmp(stat_name, "mean") == 0)
-					ldms_metric_set_double(set, index, stats.mean);
+					ldms_metric_set_double(rtd->metrics, index,
+							       stats.mean);
 				else if (strcmp(stat_name, "stddev") == 0)
-					ldms_metric_set_double(set, index, stats.std_dev);
+					ldms_metric_set_double(rtd->metrics, index,
+							       stats.std_dev);
 			}
 		}
 	}
@@ -482,7 +500,7 @@ static void rank_target_sample(struct d_tm_context *ctx,
 	for (i = 0; rank_target_dtx_metrics[i] != NULL; i++) {
 		snprintf(dtm_name, sizeof(dtm_name), "%s/tgt_%d",
 			rank_target_dtx_metrics[i],
-			target);
+			rtd->target);
 		node = d_tm_find_metric(ctx, dtm_name);
 		if (node == NULL) {
 			log_fn(LDMSD_LERROR,
@@ -496,16 +514,18 @@ static void rank_target_sample(struct d_tm_context *ctx,
 			continue;
 		}
 
-		index = ldms_metric_by_name(set, rank_target_dtx_metrics[i]);
+		index = ldms_metric_by_name(rtd->metrics,
+					    rank_target_dtx_metrics[i]);
 		if (index < 0)
 			continue;
-		ldms_metric_set_u64(set, index, cur);
+		ldms_metric_set_u64(rtd->metrics, index, cur);
 	}
 
-	ldms_transaction_end(set);
+	ldms_transaction_end(rtd->metrics);
 }
 
-void rank_targets_sample(struct d_tm_context *ctx)
+void
+rank_targets_sample(struct d_tm_context *ctx, uint32_t rank)
 {
 	struct rbn *rbn;
 
@@ -514,6 +534,8 @@ void rank_targets_sample(struct d_tm_context *ctx)
 
 		rtd = container_of(rbn, struct rank_target_data,
 					rank_targets_node);
-		rank_target_sample(ctx, rtd->target, rtd->metrics);
+		if (rtd->rank != rank)
+			continue;
+		rank_target_sample(ctx, rtd);
 	}
 }
