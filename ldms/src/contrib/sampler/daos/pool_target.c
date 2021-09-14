@@ -5,14 +5,15 @@
  * SPDX-License-Identifier: BSD-2-Clause-Patent
  */
 
-#include <coll/rbt.h>
+#include "coll/rbt.h"
 #include "ldms.h"
 #include "ldmsd.h"
 
-#include <gurt/telemetry_common.h>
-#include <gurt/telemetry_consumer.h>
-#include <daos_types.h>
-#include <daos_prop.h>
+#include "gurt/telemetry_common.h"
+#include "gurt/telemetry_consumer.h"
+#include "daos_types.h"
+#include "daos_prop.h"
+
 #include "daos.h"
 
 #define INSTANCE_NAME_BUF_LEN (DAOS_SYS_NAME_MAX + \
@@ -324,11 +325,8 @@ pool_list_free(char **pools, uint64_t npool)
 }
 
 static void
-get_system_pools_targets(struct d_tm_context *ctx, char **system,
-			 uint32_t *rank, int *ntarget,
-			 char ***pools, uint64_t *npool)
+get_pools(struct d_tm_context *ctx, char ***pools, uint64_t *npool)
 {
-	uint64_t		 ctr_rank = -1;
 	struct d_tm_nodeList_t	*list = NULL;
 	struct d_tm_nodeList_t	*head = NULL;
 	struct d_tm_node_t	*node = NULL;
@@ -336,24 +334,8 @@ get_system_pools_targets(struct d_tm_context *ctx, char **system,
 	char			**tmp_pools = NULL;
 	int			 i, rc;
 
-	if (system == NULL || rank == NULL || ntarget == NULL \
-		|| pools == NULL || npool == NULL)
+	if (pools == NULL || npool == NULL)
 		return;
-
-	// TODO: Get all of this info from segment metadata.
-	*system = strdup("daos_server");
-
-	node = d_tm_find_metric(ctx, "/rank");
-	if (node != NULL)
-		d_tm_get_counter(ctx, &ctr_rank, node);
-	*rank = ctr_rank;
-
-	*ntarget = 8;
-	/*node = d_tm_find_metric(ctx, "num_targets");
-	if (node != NULL) {
-		d_tm_get_gauge(ctx, ntarget, NULL, node);
-	}
-	*/
 
 	node = d_tm_find_metric(ctx, "/pool");
 	if (node == NULL)
@@ -466,7 +448,7 @@ pool_targets_destroy(void)
 }
 
 void
-pool_targets_refresh(int num_engines)
+pool_targets_refresh(const char *system, int num_engines, int num_targets)
 {
 	int			 i;
 	struct rbt		 new_pools;
@@ -478,13 +460,11 @@ pool_targets_refresh(int num_engines)
 	rbt_init(&new_pool_targets, string_comparator);
 
 	for (i = 0; i < num_engines; i++) {
-		char		    *system = NULL;
 		char		    **pools = NULL;
 		uint64_t	     npools = 0;
 		struct d_tm_context *ctx = NULL;
 		uint32_t	     rank = -1;
-		int		     ntarget = 0;
-		int		     j;
+		int		     rc, j;
 
 		ctx = d_tm_open(i);
 		if (!ctx) {
@@ -492,11 +472,16 @@ pool_targets_refresh(int num_engines)
 			continue;
 		}
 
-		get_system_pools_targets(ctx, &system, &rank, &ntarget,
-					 &pools, &npools);
+		rc = get_daos_rank(ctx, &rank);
+		if (rc != 0) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": get_daos_rank() for shm %d failed\n", i);
+			continue;
+		}
 
+		get_pools(ctx, &pools, &npools);
 		log_fn(LDMSD_LDEBUG, SAMP": rank %d, ntarget %d, npools %d\n",
-					rank, ntarget, npools);
+					rank, num_targets, npools);
 		/* iterate through all the pools */
 		for (j = 0; j < npools; j++) {
 			char *pool = pools[j];
@@ -529,7 +514,7 @@ pool_targets_refresh(int num_engines)
 			}
 			rbt_ins(&new_pools, &pd->pool_node);
 
-			for (target = 0; target < ntarget; target++) {
+			for (target = 0; target < num_targets; target++) {
 				struct rbn *rbn = NULL;
 				struct pool_target_data *ptd = NULL;
 
@@ -557,7 +542,6 @@ pool_targets_refresh(int num_engines)
 		}
 
 		pool_list_free(pools, npools);
-		free(system);
 		d_tm_close(&ctx);
 	}
 

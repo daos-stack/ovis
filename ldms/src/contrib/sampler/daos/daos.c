@@ -12,14 +12,20 @@
 
 #include "gurt/telemetry_common.h"
 #include "gurt/telemetry_consumer.h"
+#include "daos_types.h"
 #include "daos.h"
+
 #include "rank_target.h"
 #include "pool_target.h"
 
 ldmsd_msg_log_f log_fn;
 static ldmsd_msg_log_f msglog;
 static int engine_count = 2;
+static int target_count = 8;
+char system_name[DAOS_SYS_NAME_MAX+1];
 char producer_name[LDMS_PRODUCER_NAME_MAX];
+
+#define DEFAULT_SYS_NAME "daos_server"
 
 static int
 config(struct ldmsd_plugin *self,
@@ -37,6 +43,18 @@ config(struct ldmsd_plugin *self,
 			return -EINVAL;
 		}
 	}
+	log_fn(LDMSD_LDEBUG, SAMP": producer: %s\n", producer_name);
+
+	ival = av_value(avl, "system");
+	if (ival) {
+		if (strlen(ival) < sizeof(system_name)) {
+			strncpy(system_name, ival, sizeof(system_name));
+		} else {
+			log_fn(LDMSD_LERROR, SAMP": config: system name too long.\n");
+			return -EINVAL;
+		}
+	}
+	log_fn(LDMSD_LDEBUG, SAMP": system: %s\n", system_name);
 
 	ival = av_value(avl, "engine_count");
 	if (ival) {
@@ -47,11 +65,21 @@ config(struct ldmsd_plugin *self,
 	}
 	log_fn(LDMSD_LDEBUG, SAMP": engine_count: %d\n", engine_count);
 
+	ival = av_value(avl, "target_count");
+	if (ival) {
+		int cfg_tgt_count = atoi(ival);
+		if (cfg_tgt_count > 0) {
+			target_count = cfg_tgt_count;
+		}
+	}
+	log_fn(LDMSD_LDEBUG, SAMP": target_count: %d\n", target_count);
+
+
 out:
 	return 0;
 }
 
-static int
+int
 get_daos_rank(struct d_tm_context *ctx, uint32_t *rank)
 {
 	uint64_t		 val = -1;
@@ -90,8 +118,8 @@ sample(struct ldmsd_sampler *self)
 		}
 	}
 
-	rank_targets_refresh(engine_count);
-	pool_targets_refresh(engine_count);
+	rank_targets_refresh(system_name, engine_count, target_count);
+	pool_targets_refresh(system_name, engine_count, target_count);
 
 	for (i = 0; i < engine_count; i++) {
 		ctx = d_tm_open(i);
@@ -156,6 +184,7 @@ get_plugin(ldmsd_msg_log_f pf)
 	log_fn = pf;
 	log_fn(LDMSD_LDEBUG, SAMP": get_plugin() called ("PACKAGE_STRING")\n");
 	gethostname(producer_name, sizeof(producer_name));
+	strncpy(system_name, DEFAULT_SYS_NAME, sizeof(system_name));
 
 	return &daos_plugin.base;
 }

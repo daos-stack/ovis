@@ -15,3 +15,5 @@ static int string_comparator(void *a, const void *b)
 {
 	return strcmp((char *)a, (char *)b);
 }
+
+int get_daos_rank(struct d_tm_context *ctx, uint32_t *rank);

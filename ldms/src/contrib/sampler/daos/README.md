@@ -14,12 +14,12 @@ from the top of the ovis clone.
 # Running
 
 The following steps assume that you have a running daos server with at least one engine configured. The
-default config assumes two -- setting engine_count=1 in the sampler config will override this.
+default config assumes two -- setting engine_count=1 in the sampler config will override this. If no target_count value is set, the default of 8 is used.
 
 First, create a simple sampler config to enable DAOS sampling, e.g.
 ```
 load name=daos
-config name=daos producer=${HOSTNAME}
+config name=daos producer=${HOSTNAME} system=${DAOS_SYSTEM} target_count=${DAOS_NUM_TARGET}
 start name=daos interval=${SAMPLE_INTERVAL}
 ```
 

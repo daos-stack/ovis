@@ -5,13 +5,14 @@
  * SPDX-License-Identifier: BSD-2-Clause-Patent
  */
 
-#include <coll/rbt.h>
+#include "coll/rbt.h"
 #include "ldms.h"
 #include "ldmsd.h"
 
-#include <gurt/telemetry_common.h>
-#include <gurt/telemetry_consumer.h>
-#include <daos_types.h>
+#include "gurt/telemetry_common.h"
+#include "gurt/telemetry_consumer.h"
+#include "daos_types.h"
+
 #include "daos.h"
 
 #define INSTANCE_NAME_BUF_LEN (DAOS_SYS_NAME_MAX + 17)
@@ -220,7 +221,7 @@ err1:
 }
 
 struct rank_target_data *
-rank_target_create(char *system, uint32_t rank,
+rank_target_create(const char *system, uint32_t rank,
 		   uint32_t target, const char *instance_name)
 {
 	struct rank_target_data	*rtd = NULL;
@@ -272,32 +273,6 @@ err1:
 }
 
 static void
-get_system_rank_targets(struct d_tm_context *ctx, char **system,
-			uint32_t *rank, uint32_t *ntarget)
-{
-	uint64_t		 ctr_rank = -1;
-	struct d_tm_node_t	*node;
-
-	if (system == NULL || rank == NULL || ntarget == NULL)
-		return;
-
-	// TODO: Get all of this info from segment metadata.
-	*system = strdup("daos_server");
-
-	node = d_tm_find_metric(ctx, "/rank");
-	if (node != NULL)
-		d_tm_get_counter(ctx, &ctr_rank, node);
-	*rank = ctr_rank;
-
-	*ntarget = 8;
-	/*node = d_tm_find_metric(ctx, "num_targets");
-	if (node != NULL) {
-		d_tm_get_gauge(ctx, ntarget, NULL, node);
-	}
-	*/
-}
-
-static void
 rank_target_destroy(struct rank_target_data *rtd)
 {
 	if (rtd == NULL)
@@ -333,7 +308,7 @@ rank_targets_destroy(void)
 }
 
 void
-rank_targets_refresh(int num_engines)
+rank_targets_refresh(const char *system, int num_engines, int num_targets)
 {
 	int			 i;
 	struct rbt		 new_rank_targets;
@@ -343,20 +318,24 @@ rank_targets_refresh(int num_engines)
 	rbt_init(&new_rank_targets, string_comparator);
 
 	for (i = 0; i < num_engines; i++) {
-		char		    *system = NULL;
 		struct d_tm_context *ctx = NULL;
 		uint32_t	     rank = -1;
-		int		     ntarget = 0;
+		int		     rc;
 
 		ctx = d_tm_open(i);
 		if (!ctx) {
-			log_fn(LDMSD_LERROR, SAMP": Failed to open tm shm %d\n", i);
+			log_fn(LDMSD_LERROR, SAMP": d_tm_open(%d) failed\n", i);
 			continue;
 		}
 
-		get_system_rank_targets(ctx, &system, &rank, &ntarget);
+		rc = get_daos_rank(ctx, &rank);
+		if (rc != 0) {
+			log_fn(LDMSD_LERROR,
+			       SAMP": get_daos_rank() for shm %d failed\n", i);
+			continue;
+		}
 
-		for (target = 0; target < ntarget; target++) {
+		for (target = 0; target < num_targets; target++) {
 			struct rbn *rbn = NULL;
 			struct rank_target_data *rtd = NULL;
 
@@ -384,7 +363,6 @@ rank_targets_refresh(int num_engines)
 			rbt_ins(&new_rank_targets, &rtd->rank_targets_node);
 		}
 
-		free(system);
 		d_tm_close(&ctx);
 	}
 
