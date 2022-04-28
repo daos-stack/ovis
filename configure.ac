@@ -479,25 +479,38 @@ AC_SUBST([LDFLAGS_READLINE])
 LIBS=$TMPLIBS
 
 # DAOS telemetry support
-AC_MSG_CHECKING([for DAOS telemetry library])
+#AC_MSG_CHECKING([for DAOS telemetry library])
 AC_ARG_WITH([daos],
 	[AS_HELP_STRING([--with-daos],
-		[build DAOS telemetry sampler @<:@default=no@:>@])],
-	[], [with_daos=no])
-AC_MSG_RESULT([$with_daos])
+		[build DAOS telemetry sampler @<:@default=check@:>@])],
+		[AS_IF([test "x$withval" != xyes -a "x$withval" != xno],
+			[DAOS_CFLAGS="-I$withval/include"
+			 DAOS_LDFLAGS="-L$withval/lib64"]
+		)],
+	[with_daos=check])
+have_daos=no
+AC_SUBST([DAOS_CFLAGS])
+AC_SUBST([DAOS_LDFLAGS])
 AS_IF([test "x$with_daos" != xno], [
-	DAOS="yes"
-	LDFLAGS="$LDFLAGS -L$with_daos/lib64 -Wl,--enable-new-dtags -Wl,-rpath=$with_daos/lib64"
-	CFLAGS="$CFLAGS -I$with_daos/include"
-	AC_CHECK_HEADER(gurt/common.h,, [unset DAOS])
-	AC_CHECK_HEADER(gurt/telemetry_common.h,, [unset DAOS])
-	AC_CHECK_HEADER(gurt/telemetry_consumer.h,, [unset DAOS])
-	AC_CHECK_LIB([gurt], [d_tm_init],, [unset DAOS])
+	save_LDFLAGS=$LDFLAGS
+	LDFLAGS="$LDFLAGS $DAOS_LDFLAGS"
+	save_CFLAGS=$CFLAGS
+	CFLAGS="$CFLAGS $DAOS_CFLAGS"
+	save_CPPFLAGS=$CPPFLAGS
+	CPPFLAGS="$CPPFLAGS $DAOS_CFLAGS"
+	AC_CHECK_HEADER(gurt/common.h, [have_daos=yes], [have_daos=no])
+	AC_CHECK_HEADER(gurt/telemetry_common.h, [have_daos=yes], [have_daos=no])
+	AC_CHECK_HEADER(gurt/telemetry_consumer.h, [have_daos=yes], [have_daos=no])
+	AC_CHECK_LIB([gurt], [d_tm_init], [have_daos=yes], [have_daos=no])
+	CPPFLAGS=$save_CPPFLAGS
+	CFLAGS=$save_CFLAGS
+	LDFLAGS=$save_LDFLAGS
 ])
-AM_CONDITIONAL([ENABLE_DAOS_SAMPLER], [test x$DAOS = xyes])
+AM_CONDITIONAL([ENABLE_DAOS_SAMPLER], [test x$have_daos = xyes])
 AM_COND_IF([ENABLE_DAOS_SAMPLER],[
 	AC_DEFINE([ENABLE_DAOS_SAMPLER], [], [Build DAOS telemetry sampler])
 ])
+#AC_MSG_RESULT([$with_daos])
 
 dnl Munge library check
 if test -z "$ENABLE_MUNGE_TRUE"; then

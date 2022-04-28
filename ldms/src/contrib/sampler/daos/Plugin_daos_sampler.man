@@ -1,0 +1,41 @@
+.\" Manpage for Plugin_daos_sampler
+.TH man 7 "28 Apr 2022" "v1" "LDMS Plugin daos_sampler man page"
+
+.SH NAME
+Plugin_daos_sampler - man page for the LDMS DAOS sampler plugin
+
+.SH SYNOPSIS
+Within ldmsd_controller or a configuration file:
+.br
+load name=daos
+.br
+config name=daos producer=${HOSTNAME}
+.br
+start name=daos interval=1000000
+
+.SH DESCRIPTION
+The daos_sampler plugin collects DAOS telemetry from local DAOS I/O Engine instances.
+
+.SH CONFIGURATION ATTRIBUTE SYNTAX
+The daos_sampler plugin uses the sampler_base base class. This man page only covers the configuration attributes specific to this plugin; see ldms_sampler_base.man for the attributes of the base class.
+
+.TP
+name=<plugin_name>
+.br
+This MUST be daos_sampler.
+.TP
+producer=$HOSTNAME
+.br
+The $HOSTNAME variable provides a good unique producer ID.
+.TP
+engine_count=2
+.br
+The default is 2; don't change it unless the number of per-server engines is different.
+.TP
+target_count=8
+.br
+The default is 8; don't change it unless the number of targets per engine is different.
+.RE
+
+.SH BUGS
+Bugs? What bugs. I resent the implication!
