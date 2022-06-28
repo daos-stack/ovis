@@ -1,6 +1,9 @@
-# Overview
+DAOS LDMS SAMPLER PLUGIN
+========================
 
-This is a work-in-progress sampler for [DAOS](https://github.com/daos-stack/daos/).
+This directory contains the source, build scripts, and unit tests for the DAOS
+LDMS Sampler Plugin. When enabled, this sampler reads the telemetry exposed by
+each local [DAOS Storage Engine](https://github.com/daos-stack/daos).
 
 # Building
 
@@ -18,15 +21,14 @@ default config assumes two -- setting engine_count=1 in the sampler config will 
 
 First, create a simple sampler config to enable DAOS sampling, e.g.
 ```
-load name=daos
-config name=daos producer=${HOSTNAME} system=${DAOS_SYSTEM} target_count=${DAOS_NUM_TARGET}
-start name=daos interval=${SAMPLE_INTERVAL}
+load name=daos_sampler
+config name=daos_sampler producer=${HOSTNAME} system=${DAOS_SYSTEM} target_count=${DAOS_NUM_TARGET}
+start name=daos_sampler interval=${SAMPLE_INTERVAL}
 ```
 
 Next, start ldmsd in foreground mode with debug logging enabled: `SAMPLE_INTERVAL=5000000 ldmsd -m1MB -x sock:10444 -v DEBUG -F -c /path/to/sampler.conf`
 
-NOTE: The default memory size (512KB) is too small for the number of metrics collected. Larger sizes may be specified for
-a large number of pools.
+NOTE: The default memory size (512KB) is too small for the number of metrics collected. Larger sizes may be specified for a large number of pools.
 
 Finally, run ldms_ls in order to see the collected metrics (updated every 5s with the sample interval shown above):
 ```
@@ -63,6 +65,5 @@ D d64        io/latency/update/128KB/stddev             238.011404
 ```
 
 # TODO
-- Add networking/dtx stats
-- General hardening and error handling
-
+ * Configurable filtering of metrics
+ * Dynamic schema generation based on runtime telemetry tree
