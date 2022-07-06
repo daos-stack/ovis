@@ -1,3 +1,4 @@
+SUBDIRS=test
 pkglib_LTLIBRARIES =
 lib_LTLIBRARIES =
 dist_man7_MANS =

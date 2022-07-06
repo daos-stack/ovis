@@ -58,13 +58,75 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <gurt/telemetry_common.h>
+#include "gurt/telemetry_common.h"
 
-int pool_target_schema_is_initialized(void);
-int pool_target_schema_init(void);
-void pool_target_schema_fini(void);
+#include "ldms.h"
+#include "ldmsd.h"
+#include "config.h"
+#include "mmalloc.h"
+#include "sampler_base.h"
 
-void pool_targets_refresh(const char *system, int num_engines, int num_targets);
-void pool_targets_sample(struct d_tm_context *ctx, uint32_t rank);
-void pool_targets_destroy(void);
-void pools_destroy(void);
+#include "../daos.h"
+#include "../rank_target.h"
+
+static void
+test_log(enum ldmsd_loglevel level, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+}
+
+extern struct ldmsd_plugin *get_plugin(ldmsd_msg_log_f pf);
+
+int basic_smoke_test(void)
+{
+	int rc;
+	struct ldmsd_plugin *plugin = NULL;
+	struct ldmsd_plugin_cfg *cfg = NULL;
+
+	plugin = get_plugin(test_log);
+	if (!plugin) {
+		log_fn(LDMSD_LERROR, "get_plugin failed\n");
+		return -1;
+	}
+
+	cfg = malloc(sizeof(*cfg));
+	if (!cfg) {
+		log_fn(LDMSD_LERROR, "malloc failed\n");
+		return -1;
+	}
+
+	cfg->plugin = plugin;
+
+	rc = cfg->sampler->sample(cfg->sampler);
+	if (rc != 0) {
+		log_fn(LDMSD_LERROR, "sample failed: %d\n", rc);
+		return -1;
+	}
+
+	plugin->term(plugin);
+	free(cfg);
+
+	return 0;
+}
+
+void main(void)
+{
+	int rc;
+
+	log_fn = test_log;
+
+	if (mm_init(512 * 1024 * 1024, 1024)) {
+		log_fn(LDMSD_LERROR, "mm_init failed\n");
+		return;
+	}
+
+	rc = basic_smoke_test();
+	if (rc != 0) {
+		log_fn(LDMSD_LERROR, "basic_smoke_test failed: %d\n", rc);
+		return;
+	}
+}

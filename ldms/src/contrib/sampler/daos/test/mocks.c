@@ -58,13 +58,127 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <gurt/telemetry_common.h>
+#include "mocks.h"
+#include "ldms.h"
 
-int pool_target_schema_is_initialized(void);
-int pool_target_schema_init(void);
-void pool_target_schema_fini(void);
+/* As used by the daos telemetry library, this type is opaque and
+ * used for internal recordkeeping. Since we are mocking out the
+ * telemetry API, we can use it for our own purposes.
+ */
+struct d_tm_context {
+	int     rank;
+};
 
-void pool_targets_refresh(const char *system, int num_engines, int num_targets);
-void pool_targets_sample(struct d_tm_context *ctx, uint32_t rank);
-void pool_targets_destroy(void);
-void pools_destroy(void);
+struct d_tm_context *
+d_tm_open(int id)
+{
+	struct d_tm_context *ctx;
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (ctx == NULL)
+		return NULL;
+
+	ctx->rank = id;
+	return ctx;
+}
+
+void
+d_tm_close(struct d_tm_context **ctx)
+{
+	if (ctx == NULL || *ctx == NULL)
+		return;
+
+	free(*ctx);
+	*ctx = NULL;
+}
+
+static struct d_tm_metric_t dummy_metric = {0};
+static struct d_tm_node_t dummy_node = {0};
+static char *dummy_pool = "dummy_pool";
+
+struct d_tm_node_t *
+d_tm_find_metric(struct d_tm_context *ctx, char *path)
+{
+	struct d_tm_node_t *node = &dummy_node;
+
+	node->dtn_name = path;
+	if (!strcmp(path, "/pool")) {
+		node->dtn_type = D_TM_DIRECTORY;
+	} else {
+		node->dtn_type = D_TM_GAUGE;
+		node->dtn_metric = &dummy_metric;
+		node->dtn_metric->dtm_data.value = ctx->rank;
+	}
+
+	return node;
+}
+
+int
+d_tm_list_subdirs(struct d_tm_context *ctx, struct d_tm_nodeList_t **head,
+		  struct d_tm_node_t *node, uint64_t *node_count,
+		  int max_depth)
+{
+	int     rc;
+
+	if (node->dtn_type != D_TM_DIRECTORY)
+		return -DER_INVAL;
+
+	if (!strcmp(node->dtn_name, "/pool")) {
+		node->dtn_name = dummy_pool;
+		rc = d_tm_list_add_node(&dummy_node, head);
+		if (rc)
+			return rc;
+		*node_count = 1;
+	} else {
+		*head = NULL;
+		*node_count = 0;
+	}
+	return 0;
+}
+
+void
+d_tm_list_free(struct d_tm_nodeList_t *list)
+{
+	struct d_tm_nodeList_t *head = NULL;
+
+	while (list) {
+		head = list->dtnl_next;
+		free(list);
+		list = head;
+	}
+}
+
+char *
+d_tm_get_name(struct d_tm_context *ctx, struct d_tm_node_t *node)
+{
+	if (ctx == NULL || node == NULL)
+		return NULL;
+
+	return node->dtn_name;
+}
+
+int
+d_tm_get_counter(struct d_tm_context *ctx, uint64_t *value,
+		 struct d_tm_node_t *node)
+{
+	if (ctx == NULL || node == NULL || value == NULL)
+		return -1;
+
+	*value = node->dtn_metric->dtm_data.value;
+	return 0;
+}
+
+int
+d_tm_get_gauge(struct d_tm_context *ctx, uint64_t *value,
+	       struct d_tm_stats_t *stats, struct d_tm_node_t *node)
+{
+	if (ctx == NULL || node == NULL || value == NULL)
+		return -1;
+
+	*value = node->dtn_metric->dtm_data.value;
+	return 0;
+}
+
+/* stub these out so that we can call the plugin outside of ldmsd */
+int ldmsd_set_register(ldms_set_t set, const char *plugin_name) { return 0; }
+void ldmsd_set_deregister(const char *inst_name, const char *plugin_name) {}

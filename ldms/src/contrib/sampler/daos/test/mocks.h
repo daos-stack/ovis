@@ -58,13 +58,23 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __DAOS_SAMPLER_MOCKS_H__
+#define __DAOS_SAMPLER_MOCKS_H__
+
 #include <gurt/telemetry_common.h>
 
-int pool_target_schema_is_initialized(void);
-int pool_target_schema_init(void);
-void pool_target_schema_fini(void);
+struct d_tm_context *d_tm_open(int id);
+void d_tm_close(struct d_tm_context **ctx);
+struct d_tm_node_t *d_tm_find_metric(struct d_tm_context *ctx,
+				     char *path);
+int d_tm_list_subdirs(struct d_tm_context *ctx, struct d_tm_nodeList_t **head,
+		      struct d_tm_node_t *node, uint64_t *node_count,
+		      int max_depth);
+void d_tm_list_free(struct d_tm_nodeList_t *nodeList);
+char *d_tm_get_name(struct d_tm_context *ctx, struct d_tm_node_t *node);
+int d_tm_get_counter(struct d_tm_context *ctx, uint64_t *val,
+		     struct d_tm_node_t *node);
+int d_tm_get_gauge(struct d_tm_context *ctx, uint64_t *val,
+		   struct d_tm_stats_t *stats, struct d_tm_node_t *node);
 
-void pool_targets_refresh(const char *system, int num_engines, int num_targets);
-void pool_targets_sample(struct d_tm_context *ctx, uint32_t rank);
-void pool_targets_destroy(void);
-void pools_destroy(void);
+#endif /* __DAOS_SAMPLER_MOCKS_H__ */

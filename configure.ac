@@ -924,6 +924,7 @@ ldms/src/sampler/syspapi/Makefile
 ldms/src/sampler/app_sampler/Makefile
 ldms/src/contrib/sampler/Makefile
 ldms/src/contrib/sampler/daos/Makefile
+ldms/src/contrib/sampler/daos/test/Makefile
 ldms/src/contrib/sampler/ipmireader/Makefile
 ldms/src/contrib/sampler/tutorial/Makefile
 ldms/src/third-plugins/Makefile

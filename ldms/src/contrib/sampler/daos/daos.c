@@ -110,18 +110,18 @@ static int config(struct ldmsd_plugin *self, struct attr_value_list *kwl, struct
 	ival = av_value(avl, "engine_count");
 	if (ival) {
 		int cfg_engine_count = atoi(ival);
-		if (cfg_engine_count > 0) {
+
+		if (cfg_engine_count > 0)
 			engine_count = cfg_engine_count;
-		}
 	}
 	log_fn(LDMSD_LDEBUG, SAMP": engine_count: %d\n", engine_count);
 
 	ival = av_value(avl, "target_count");
 	if (ival) {
 		int cfg_tgt_count = atoi(ival);
-		if (cfg_tgt_count > 0) {
+
+		if (cfg_tgt_count > 0)
 			target_count = cfg_tgt_count;
-		}
 	}
 	log_fn(LDMSD_LDEBUG, SAMP": target_count: %d\n", target_count);
 
@@ -201,6 +201,7 @@ static void term(struct ldmsd_plugin *self)
 	rank_targets_destroy();
 	rank_target_schema_fini();
 	pool_targets_destroy();
+	pools_destroy();
 	pool_target_schema_fini();
 }
 
