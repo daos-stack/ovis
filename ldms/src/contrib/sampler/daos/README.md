@@ -1,4 +1,4 @@
-DAOS LDMS SAMPLER PLUGIN
+DAOS LDMS Sampler Plugin
 ========================
 
 This directory contains the source, build scripts, and unit tests for the DAOS

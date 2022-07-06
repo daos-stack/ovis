@@ -173,16 +173,14 @@ struct pool_target_data {
 	struct rbn	 pool_targets_node;
 };
 
-int
-pool_target_schema_is_initialized(void)
+int pool_target_schema_is_initialized(void)
 {
 	if (pool_target_schema != NULL && pool_schema != NULL)
 		return 0;
 	return -1;
 }
 
-void
-pool_target_schema_fini(void)
+void pool_target_schema_fini(void)
 {
 	log_fn(LDMSD_LDEBUG, SAMP": pool_target_schema_fini()\n");
 	if (pool_target_schema != NULL) {
@@ -196,8 +194,7 @@ pool_target_schema_fini(void)
 	}
 }
 
-int
-pool_target_schema_init(void)
+int pool_target_schema_init(void)
 {
 	ldms_schema_t	p_sch = NULL;
 	ldms_schema_t	pt_sch = NULL;
@@ -284,9 +281,8 @@ err1:
 	return -1;
 }
 
-static struct pool_data *
-pool_create(const char *system, uint32_t rank, const char *pool,
-	    const char *instance_name)
+static struct pool_data *pool_create(const char *system, uint32_t rank,
+				     const char *pool, const char *instance_name)
 {
 	char			*key = NULL;
 	struct pool_data	*pd = NULL;
@@ -342,10 +338,8 @@ err1:
 	return NULL;
 }
 
-
-static struct pool_target_data *
-pool_target_create(const char *system, uint32_t rank, const char *pool,
-		   uint32_t target, const char *instance_name)
+static struct pool_target_data *pool_target_create(const char *system, uint32_t rank, const char *pool,
+						   uint32_t target, const char *instance_name)
 {
 	char			*key = NULL;
 	struct pool_target_data	*ptd = NULL;
@@ -404,8 +398,7 @@ err1:
 	return NULL;
 }
 
-static void
-pool_list_free(char **pools, uint64_t npool)
+static void pool_list_free(char **pools, uint64_t npool)
 {
 	int i;
 
@@ -419,8 +412,7 @@ pool_list_free(char **pools, uint64_t npool)
 	free(pools);
 }
 
-static void
-get_pools(struct d_tm_context *ctx, char ***pools, uint64_t *npool)
+static void get_pools(struct d_tm_context *ctx, char ***pools, uint64_t *npool)
 {
 	struct d_tm_nodeList_t	*list = NULL;
 	struct d_tm_nodeList_t	*head = NULL;
@@ -470,8 +462,7 @@ err1:
 	pool_list_free(tmp_pools, num_pools);
 }
 
-static void
-pool_destroy(struct pool_data *pd)
+static void pool_destroy(struct pool_data *pd)
 {
 	if (pd == NULL)
 		return;
@@ -487,15 +478,13 @@ pool_destroy(struct pool_data *pd)
 	free(pd);
 }
 
-void
-pools_destroy(void)
+void pools_destroy(void)
 {
 	struct rbn *rbn;
 	struct pool_data *pd;
 
 	if (rbt_card(&pool_tree) > 0)
-		log_fn(LDMSD_LDEBUG, SAMP": destroying %lu pool\n",
-				     rbt_card(&pool_tree));
+		log_fn(LDMSD_LDEBUG, SAMP": destroying %lu pool\n", rbt_card(&pool_tree));
 
 	while (!rbt_empty(&pool_tree)) {
 		rbn = rbt_min(&pool_tree);
@@ -506,8 +495,7 @@ pools_destroy(void)
 	}
 }
 
-static void
-pool_target_destroy(struct pool_target_data *ptd)
+static void pool_target_destroy(struct pool_target_data *ptd)
 {
 	if (ptd == NULL)
 		return;
@@ -523,27 +511,23 @@ pool_target_destroy(struct pool_target_data *ptd)
 	free(ptd);
 }
 
-void
-pool_targets_destroy(void)
+void pool_targets_destroy(void)
 {
 	struct rbn *rbn;
 	struct pool_target_data *ptd;
 
 	if (rbt_card(&pool_targets) > 0)
-		log_fn(LDMSD_LDEBUG, SAMP": destroying %lu pool targets\n",
-				     rbt_card(&pool_targets));
+		log_fn(LDMSD_LDEBUG, SAMP": destroying %lu pool targets\n", rbt_card(&pool_targets));
 
 	while (!rbt_empty(&pool_targets)) {
 		rbn = rbt_min(&pool_targets);
-		ptd = container_of(rbn, struct pool_target_data,
-					pool_targets_node);
+		ptd = container_of(rbn, struct pool_target_data, pool_targets_node);
 		rbt_del(&pool_targets, rbn);
 		pool_target_destroy(ptd);
 	}
 }
 
-void
-pool_targets_refresh(const char *system, int num_engines, int num_targets)
+void pool_targets_refresh(const char *system, int num_engines, int num_targets)
 {
 	int			 i;
 	struct rbt		 new_pools;
@@ -563,20 +547,18 @@ pool_targets_refresh(const char *system, int num_engines, int num_targets)
 
 		ctx = d_tm_open(i);
 		if (!ctx) {
-			log_fn(LDMSD_LERROR, SAMP": Failed to open tm shm %d\n", i);
+			log_fn(LDMSD_LDEBUG, SAMP": d_tm_open(%d) failed\n", i);
 			continue;
 		}
 
 		rc = get_daos_rank(ctx, &rank);
 		if (rc != 0) {
-			log_fn(LDMSD_LERROR,
-			       SAMP": get_daos_rank() for shm %d failed\n", i);
+			log_fn(LDMSD_LERROR, SAMP": get_daos_rank() for shm %d failed\n", i);
 			continue;
 		}
 
 		get_pools(ctx, &pools, &npools);
-		log_fn(LDMSD_LDEBUG, SAMP": rank %d, ntarget %d, npools %d\n",
-					rank, num_targets, npools);
+		log_fn(LDMSD_LDEBUG, SAMP": rank %d, ntarget %d, npools %d\n", rank, num_targets, npools);
 		/* iterate through all the pools */
 		for (j = 0; j < npools; j++) {
 			char *pool = pools[j];
@@ -584,18 +566,15 @@ pool_targets_refresh(const char *system, int num_engines, int num_targets)
 			struct pool_data *pd = NULL;
 
 			if (pool == NULL) {
-				log_fn(LDMSD_LERROR, SAMP": rank %d, idx %d: pool is NULL\n",
-							rank, j);
+				log_fn(LDMSD_LERROR, SAMP": rank %d, idx %d: pool is NULL\n", rank, j);
 				continue;
 			}
 
-			snprintf(instance_name, sizeof(instance_name),
-					"%s/%d/%s", system, rank, pool);
+			snprintf(instance_name, sizeof(instance_name), "%s/%d/%s", system, rank, pool);
 
 			prbn = rbt_find(&pool_tree, instance_name);
 			if (prbn) {
-				pd = container_of(prbn, struct pool_data,
-						  pool_node);
+				pd = container_of(prbn, struct pool_data, pool_node);
 				rbt_del(&pool_tree, &pd->pool_node);
 				//log_fn(LDMSD_LDEBUG, SAMP": found %s\n", pd->pool_node.key);
 			} else {
@@ -640,50 +619,42 @@ pool_targets_refresh(const char *system, int num_engines, int num_targets)
 		d_tm_close(&ctx);
 	}
 
-	if (!rbt_empty(&new_pool_targets)) {
-		pool_targets_destroy();
+	pool_targets_destroy();
+	if (!rbt_empty(&new_pool_targets))
 		memcpy(&pool_targets, &new_pool_targets, sizeof(struct rbt));
-	}
-	if (!rbt_empty(&new_pools)) {
-		pools_destroy();
+	pools_destroy();
+	if (!rbt_empty(&new_pools))
 		memcpy(&pool_tree, &new_pools, sizeof(struct rbt));
-	}
 }
 
-static struct d_tm_node_t *
-pool_find_metric(struct d_tm_context *ctx, struct pool_data *pd,
-		 const char *metric, char *dtm_name_buf, size_t dtm_name_buf_len)
+static struct d_tm_node_t *pool_find_metric(struct d_tm_context *ctx, struct pool_data *pd,
+					    const char *metric, char *dtm_name_buf, size_t dtm_name_buf_len)
 {
 	struct d_tm_node_t	*node;
 
-	snprintf(dtm_name_buf, dtm_name_buf_len, "pool/%s/%s",
-		 pd->pool, metric);
+	snprintf(dtm_name_buf, dtm_name_buf_len, "pool/%s/%s", pd->pool, metric);
 	node = d_tm_find_metric(ctx, dtm_name_buf);
 	if (node == NULL) {
-		log_fn(LDMSD_LERROR,
-			SAMP": Failed to find metric %s\n", dtm_name_buf);
+		log_fn(LDMSD_LERROR, SAMP": Failed to find metric %s\n", dtm_name_buf);
 		return NULL;
 	}
 
 	return node;
 }
 
-static void
-pool_set_u64(struct pool_data *pd, const char *metric, uint64_t val)
+static void pool_set_u64(struct pool_data *pd, const char *metric, uint64_t val)
 {
 	int index = -1;
 
 	index = ldms_metric_by_name(pd->metrics, metric);
 	if (index < 0) {
-		log_fn(LDMSD_LERROR,
-			SAMP": Failed to fetch index for %s\n", metric);
+		log_fn(LDMSD_LERROR, SAMP": Failed to fetch index for %s\n", metric);
 		return;
 	}
 	ldms_metric_set_u64(pd->metrics, index, val);
 }
 
-static void
-pool_sample(struct d_tm_context *ctx, struct pool_data *pd)
+static void pool_sample(struct d_tm_context *ctx, struct pool_data *pd)
 {
 	struct d_tm_node_t	*node;
 	char			 dtm_name[256];
@@ -704,8 +675,7 @@ pool_sample(struct d_tm_context *ctx, struct pool_data *pd)
 			continue;
 		rc = d_tm_get_gauge(ctx, &cur, NULL, node);
 		if (rc != DER_SUCCESS) {
-			log_fn(LDMSD_LERROR,
-			       SAMP": Failed to fetch gauge %s\n", dtm_name);
+			log_fn(LDMSD_LERROR, SAMP": Failed to fetch gauge %s\n", dtm_name);
 			continue;
 		}
 
@@ -719,8 +689,7 @@ pool_sample(struct d_tm_context *ctx, struct pool_data *pd)
 			continue;
 		rc = d_tm_get_counter(ctx, &cur, node);
 		if (rc != DER_SUCCESS) {
-			log_fn(LDMSD_LERROR,
-			       SAMP": Failed to fetch counter %s\n", dtm_name);
+			log_fn(LDMSD_LERROR, SAMP": Failed to fetch counter %s\n", dtm_name);
 			continue;
 		}
 
@@ -729,9 +698,8 @@ pool_sample(struct d_tm_context *ctx, struct pool_data *pd)
 	ldms_transaction_end(pd->metrics);
 }
 
-static struct d_tm_node_t *
-pool_target_find_metric(struct d_tm_context *ctx, struct pool_target_data *ptd,
-			const char *metric, char *dtm_name_buf, size_t dtm_name_buf_len)
+static struct d_tm_node_t *pool_target_find_metric(struct d_tm_context *ctx, struct pool_target_data *ptd,
+						   const char *metric, char *dtm_name_buf, size_t dtm_name_buf_len)
 {
 	struct d_tm_node_t	*node;
 
@@ -739,30 +707,26 @@ pool_target_find_metric(struct d_tm_context *ctx, struct pool_target_data *ptd,
 			ptd->pool, metric, ptd->target);
 	node = d_tm_find_metric(ctx, dtm_name_buf);
 	if (node == NULL) {
-		log_fn(LDMSD_LERROR,
-			SAMP": Failed to find metric %s\n", dtm_name_buf);
+		log_fn(LDMSD_LERROR, SAMP": Failed to find metric %s\n", dtm_name_buf);
 		return NULL;
 	}
 
 	return node;
 }
 
-static void
-pool_target_set_u64(struct pool_target_data *ptd, const char *metric, uint64_t val)
+static void pool_target_set_u64(struct pool_target_data *ptd, const char *metric, uint64_t val)
 {
 	int			 index = -1;
 
 	index = ldms_metric_by_name(ptd->metrics, metric);
 	if (index < 0) {
-		log_fn(LDMSD_LERROR,
-			SAMP": Failed to fetch index for %s\n", metric);
+		log_fn(LDMSD_LERROR, SAMP": Failed to fetch index for %s\n", metric);
 		return;
 	}
 	ldms_metric_set_u64(ptd->metrics, index, val);
 }
 
-static void
-pool_target_sample(struct d_tm_context *ctx, struct pool_target_data *ptd)
+static void pool_target_sample(struct d_tm_context *ctx, struct pool_target_data *ptd)
 {
 	struct d_tm_node_t	*node;
 	char			 dtm_name[256];
@@ -782,8 +746,7 @@ pool_target_sample(struct d_tm_context *ctx, struct pool_target_data *ptd)
 			continue;
 		rc = d_tm_get_gauge(ctx, &cur, NULL, node);
 		if (rc != DER_SUCCESS) {
-			log_fn(LDMSD_LERROR,
-			       SAMP": Failed to fetch gauge %s\n", dtm_name);
+			log_fn(LDMSD_LERROR, SAMP": Failed to fetch gauge %s\n", dtm_name);
 			continue;
 		}
 
@@ -797,8 +760,7 @@ pool_target_sample(struct d_tm_context *ctx, struct pool_target_data *ptd)
 			continue;
 		rc = d_tm_get_counter(ctx, &cur, node);
 		if (rc != DER_SUCCESS) {
-			log_fn(LDMSD_LERROR,
-			       SAMP": Failed to fetch counter %s\n", dtm_name);
+			log_fn(LDMSD_LERROR, SAMP": Failed to fetch counter %s\n", dtm_name);
 			continue;
 		}
 
@@ -807,16 +769,14 @@ pool_target_sample(struct d_tm_context *ctx, struct pool_target_data *ptd)
 	ldms_transaction_end(ptd->metrics);
 }
 
-void
-pool_targets_sample(struct d_tm_context *ctx, uint32_t rank)
+void pool_targets_sample(struct d_tm_context *ctx, uint32_t rank)
 {
 	struct rbn *rbn;
 
 	RBT_FOREACH(rbn, &pool_tree) {
 		struct pool_data *pd;
 
-		pd = container_of(rbn, struct pool_data,
-				  pool_node);
+		pd = container_of(rbn, struct pool_data, pool_node);
 		if (pd->rank != rank)
 			continue;
 		pool_sample(ctx, pd);
@@ -825,8 +785,7 @@ pool_targets_sample(struct d_tm_context *ctx, uint32_t rank)
 	RBT_FOREACH(rbn, &pool_targets) {
 		struct pool_target_data *ptd;
 
-		ptd = container_of(rbn, struct pool_target_data,
-				   pool_targets_node);
+		ptd = container_of(rbn, struct pool_target_data, pool_targets_node);
 		if (ptd->rank != rank)
 			continue;
 		pool_target_sample(ctx, ptd);

@@ -80,9 +80,7 @@ char producer_name[LDMS_PRODUCER_NAME_MAX];
 
 #define DEFAULT_SYS_NAME "daos_server"
 
-static int
-config(struct ldmsd_plugin *self,
-		  struct attr_value_list *kwl, struct attr_value_list *avl)
+static int config(struct ldmsd_plugin *self, struct attr_value_list *kwl, struct attr_value_list *avl)
 {
 	char	*ival;
 
@@ -127,13 +125,11 @@ config(struct ldmsd_plugin *self,
 	}
 	log_fn(LDMSD_LDEBUG, SAMP": target_count: %d\n", target_count);
 
-
 out:
 	return 0;
 }
 
-int
-get_daos_rank(struct d_tm_context *ctx, uint32_t *rank)
+int get_daos_rank(struct d_tm_context *ctx, uint32_t *rank)
 {
 	uint64_t		 val;
 	struct d_tm_node_t	*node;
@@ -153,8 +149,7 @@ get_daos_rank(struct d_tm_context *ctx, uint32_t *rank)
 	return 0;
 }
 
-static int
-sample(struct ldmsd_sampler *self)
+static int sample(struct ldmsd_sampler *self)
 {
 	struct d_tm_context	*ctx = NULL;
 	uint32_t		 rank = -1;
@@ -165,13 +160,13 @@ sample(struct ldmsd_sampler *self)
 	if (rank_target_schema_is_initialized() < 0) {
 		if (rank_target_schema_init() < 0) {
 			log_fn(LDMSD_LERROR, SAMP": rank_target_schema_init failed.\n");
-			return ENOMEM;
+			return -ENOMEM;
 		}
 	}
 	if (pool_target_schema_is_initialized() < 0) {
 		if (pool_target_schema_init() < 0) {
 			log_fn(LDMSD_LERROR, SAMP": pool_target_schema_init failed.\n");
-			return ENOMEM;
+			return -ENOMEM;
 		}
 	}
 
@@ -181,7 +176,7 @@ sample(struct ldmsd_sampler *self)
 	for (i = 0; i < engine_count; i++) {
 		ctx = d_tm_open(i);
 		if (!ctx) {
-			log_fn(LDMSD_LERROR, SAMP": Failed to open tm shm %d\n", i);
+			log_fn(LDMSD_LDEBUG, SAMP": Failed to open tm shm %d\n", i);
 			continue;
 		}
 
@@ -200,8 +195,7 @@ sample(struct ldmsd_sampler *self)
 	return rc;
 }
 
-static void
-term(struct ldmsd_plugin *self)
+static void term(struct ldmsd_plugin *self)
 {
 	log_fn(LDMSD_LDEBUG, SAMP" term() called\n");
 	rank_targets_destroy();
@@ -210,14 +204,12 @@ term(struct ldmsd_plugin *self)
 	pool_target_schema_fini();
 }
 
-static ldms_set_t
-get_set(struct ldmsd_sampler *self)
+static ldms_set_t get_set(struct ldmsd_sampler *self)
 {
 	return NULL;
 }
 
-static const char *
-usage(struct ldmsd_plugin *self)
+static const char *usage(struct ldmsd_plugin *self)
 {
 	log_fn(LDMSD_LDEBUG, SAMP" usage() called\n");
 	return  "config name=" SAMP " " BASE_CONFIG_USAGE;
@@ -235,8 +227,7 @@ static struct ldmsd_sampler daos_plugin = {
 	.sample = sample,
 };
 
-struct ldmsd_plugin *
-get_plugin(ldmsd_msg_log_f pf)
+struct ldmsd_plugin *get_plugin(ldmsd_msg_log_f pf)
 {
 	log_fn = pf;
 	log_fn(LDMSD_LDEBUG, SAMP": get_plugin() called ("PACKAGE_STRING")\n");
